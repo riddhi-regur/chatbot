@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String
+  role          String    @default("admin")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Doctor {
+  id              Int       @id @default(autoincrement())
+  name            String
+  specialization  String?
+  email           String?
+  phone           String?
+  availableDays   String[]  @default([]) @map("available_days")
+  availableHours  Json      @default("{}") @map("available_hours")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  services      Service[]
+  appointments  Appointment[]
+
+  @@map("doctors")
+}
+
+model Service {
+  id              Int       @id @default(autoincrement())
+  name            String
+  description     String?
+  durationMinutes Int       @default(30) @map("duration_minutes")
+  price           Float?
+  doctorId        Int       @map("doctor_id")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  doctor        Doctor          @relation(fields: [doctorId], references: [id])
+  appointments  Appointment[]
+
+  @@map("services")
+}
+
+model Appointment {
+  id              Int       @id @default(autoincrement())
+  patientName     String    @map("patient_name")
+  patientEmail    String?   @map("patient_email")
+  patientPhone    String?   @map("patient_phone")
+  doctorId        Int       @map("doctor_id")
+  serviceId       Int       @map("service_id")
+  appointmentDate DateTime  @map("appointment_date")
+  appointmentTime DateTime  @map("appointment_time")
+  status          String    @default("booked")
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+
+  @@map("appointments")
+}
+
+model ChatSession {
+  id          Int       @id @default(autoincrement())
+  visitorId   String    @map("visitor_id")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+
+  messages  ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id          Int       @id @default(autoincrement())
+  sessionId   Int       @map("session_id")
+  role        String
+  content     String
+  intent      String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  session  ChatSession @relation(fields: [sessionId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model KnowledgeBase {
+  id          Int       @id @default(autoincrement())
+  title       String?
+  content     String
+  category    String?
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("knowledge_base")
+}
