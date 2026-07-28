@@ -1,54 +1,135 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clinic Website - Chatbot Demo</title>
-  <style>
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #333; }
-    .hero { background: linear-gradient(135deg, #2563eb, #1e40af); color: white; padding: 60px 20px; text-align: center; }
-    .hero h1 { font-size: 2.5rem; margin-bottom: 12px; }
-    .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
-    .content { max-width: 900px; margin: 40px auto; padding: 0 20px; }
-    .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
-    .service-card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-    .service-card h3 { color: #2563eb; margin-bottom: 8px; }
-    .info { background: #f8fafc; border-radius: 12px; padding: 24px; margin-top: 24px; }
-    .info h2 { margin-top: 0; }
-  </style>
-</head>
-<body>
-  <div class="hero">
-    <h1>Smile Dental Clinic</h1>
-    <p>Your trusted dental care partner. Click the chat bubble in the bottom right to book an appointment or ask about our services.</p>
-  </div>
-  <div class="content">
-    <h2>Our Services</h2>
-    <div class="services">
-      <div class="service-card"><h3>General Checkup</h3><p>Comprehensive dental examination including X-rays and oral cancer screening.</p></div>
-      <div class="service-card"><h3>Teeth Cleaning</h3><p>Professional dental cleaning and polishing to remove plaque and tartar.</p></div>
-      <div class="service-card"><h3>Root Canal</h3><p>Advanced root canal treatment to save infected or damaged teeth.</p></div>
-      <div class="service-card"><h3>Teeth Whitening</h3><p>Professional whitening treatment for a brighter, whiter smile.</p></div>
-      <div class="service-card"><h3>Braces</h3><p>Metal and ceramic braces for teeth alignment and orthodontic treatment.</p></div>
-      <div class="service-card"><h3>Pediatric Dentistry</h3><p>Gentle dental care designed specifically for children.</p></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clinic Website - Chatbot Demo</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #333;
+      }
+      .hero {
+        background: linear-gradient(135deg, #2563eb, #1e40af);
+        color: white;
+        padding: 60px 20px;
+        text-align: center;
+      }
+      .hero h1 {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+      }
+      .hero p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      .content {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 0 20px;
+      }
+      .services {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .service-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      }
+      .service-card h3 {
+        color: #2563eb;
+        margin-bottom: 8px;
+      }
+      .info {
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 24px;
+        margin-top: 24px;
+      }
+      .info h2 {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hero">
+      <h1>Smile Dental Clinic</h1>
+      <p>
+        Your trusted dental care partner. Click the chat bubble in the bottom
+        right to book an appointment or ask about our services.
+      </p>
     </div>
-    <div class="info">
-      <h2>Visit Us</h2>
-      <p><strong>Address:</strong> 123 Health Avenue, Suite 200, Medical District</p>
-      <p><strong>Phone:</strong> +1-555-0100</p>
-      <p><strong>Hours:</strong> Mon-Fri 9:00 AM - 5:00 PM | Sat 8:00 AM - 2:00 PM</p>
+    <div class="content">
+      <h2>Our Services</h2>
+      <div class="services">
+        <div class="service-card">
+          <h3>General Checkup</h3>
+          <p>
+            Comprehensive dental examination including X-rays and oral cancer
+            screening.
+          </p>
+        </div>
+        <div class="service-card">
+          <h3>Teeth Cleaning</h3>
+          <p>
+            Professional dental cleaning and polishing to remove plaque and
+            tartar.
+          </p>
+        </div>
+        <div class="service-card">
+          <h3>Root Canal</h3>
+          <p>
+            Advanced root canal treatment to save infected or damaged teeth.
+          </p>
+        </div>
+        <div class="service-card">
+          <h3>Teeth Whitening</h3>
+          <p>Professional whitening treatment for a brighter, whiter smile.</p>
+        </div>
+        <div class="service-card">
+          <h3>Braces</h3>
+          <p>
+            Metal and ceramic braces for teeth alignment and orthodontic
+            treatment.
+          </p>
+        </div>
+        <div class="service-card">
+          <h3>Pediatric Dentistry</h3>
+          <p>Gentle dental care designed specifically for children.</p>
+        </div>
+      </div>
+      <div class="info">
+        <h2>Visit Us</h2>
+        <p>
+          <strong>Address:</strong> 123 Health Avenue, Suite 200, Medical
+          District
+        </p>
+        <p><strong>Phone:</strong> +1-555-0100</p>
+        <p>
+          <strong>Hours:</strong> Mon-Fri 9:00 AM - 5:00 PM | Sat 8:00 AM - 2:00
+          PM
+        </p>
+      </div>
     </div>
-  </div>
 
-  <!-- ClinicBot Widget -->
-  <script>
-    window.ClinicBotConfig = {
-      apiUrl: 'http://localhost:4000/api',
-      title: 'Clinic Assistant',
-      subtitle: 'We are here to help!',
-      greeting: 'Hello! Welcome to Smile Dental Clinic. I can help you with:\n- Our services and treatments\n- Doctor information\n- Booking an appointment\n- Clinic hours and location\n\nHow can I help you today?',
-    };
-  </script>
-  <script src="chatbot.js"></script>
-</body>
+    <!-- ClinicBot Widget -->
+    <script>
+      window.ClinicBotConfig = {
+        apiUrl: "http://localhost:4001/api",
+        title: "Clinic Assistant",
+        subtitle: "We are here to help!",
+        greeting:
+          "Hello! Welcome to Smile Dental Clinic. I can help you with:\n- Our services and treatments\n- Doctor information\n- Booking an appointment\n- Clinic hours and location\n\nHow can I help you today?",
+      };
+    </script>
+    <link rel="stylesheet" href="chatbot.css" />
+    <script src="chatbot.js"></script>
+  </body>
 </html>

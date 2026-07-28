@@ -1,6 +1,6 @@
 (function () {
   const CONFIG = {
-    apiUrl: window.ClinicBotConfig?.apiUrl || 'http://localhost:4000/api',
+    apiUrl: window.ClinicBotConfig?.apiUrl || 'http://localhost:4001/api',
     title: window.ClinicBotConfig?.title || 'Clinic Assistant',
     subtitle: window.ClinicBotConfig?.subtitle || 'Ask us anything about our services',
     greeting: window.ClinicBotConfig?.greeting || 'Hello! How can I help you today? I can answer questions about our services, doctors, and help you book an appointment.',

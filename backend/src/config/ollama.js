@@ -1,8 +1,8 @@
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
 
-const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
-const CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || 'llama3.2';
+const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+const EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || "nomic-embed-text";
+const CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "llama3.2";
 
 export async function checkOllamaHealth() {
   try {
@@ -15,8 +15,8 @@ export async function checkOllamaHealth() {
 
 export async function generateEmbedding(text) {
   const res = await fetch(`${OLLAMA_BASE_URL}/api/embed`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, input: text }),
   });
 
@@ -28,27 +28,66 @@ export async function generateEmbedding(text) {
   return data.embeddings[0];
 }
 
+// export async function generateChatResponse(messages, options = {}) {
+//   const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json' },
+//     body: JSON.stringify({
+//       model: CHAT_MODEL,
+//       messages,
+//       stream: false,
+//       options: {
+//         temperature: options.temperature || 0.7,
+//         num_predict: options.maxTokens || 512,
+//       },
+//     }),
+//   });
+
+//   if (!res.ok) {
+//     throw new Error(`Ollama chat failed: ${res.status}`);
+//   }
+
+//   const data = await res.json();
+//   return data.message.content;
+// }
+
 export async function generateChatResponse(messages, options = {}) {
-  const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: CHAT_MODEL,
-      messages,
-      stream: false,
-      options: {
-        temperature: options.temperature || 0.7,
-        num_predict: options.maxTokens || 512,
-      },
-    }),
+  const url = `${OLLAMA_BASE_URL}/api/chat`;
+
+  console.log("OLLAMA_BASE_URL:", OLLAMA_BASE_URL);
+  console.log("CHAT_MODEL:", CHAT_MODEL);
+  console.log("URL:", url);
+
+  const body = {
+    model: CHAT_MODEL,
+    messages,
+    stream: false,
+    options: {
+      temperature: options.temperature || 0.7,
+      num_predict: options.maxTokens || 512,
+    },
+  };
+
+  console.log("Request Body:", JSON.stringify(body, null, 2));
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
   });
+
+  console.log("Status:", res.status);
+
+  const text = await res.text();
+  console.log("Response:", text);
 
   if (!res.ok) {
     throw new Error(`Ollama chat failed: ${res.status}`);
   }
 
-  const data = await res.json();
-  return data.message.content;
+  return JSON.parse(text).message.content;
 }
 
 export { OLLAMA_BASE_URL, EMBED_MODEL, CHAT_MODEL };
