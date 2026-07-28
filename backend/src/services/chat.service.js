@@ -113,10 +113,10 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     }
 
     const bareName = message.trim().match(
-      /^[A-Z][a-z]{1,30}$/,
+      /^[A-Za-z]{2,30}$/,
     );
     if (bareName) {
-      const name = bareName[0];
+      const name = bareName[0].replace(/^\w/, (c) => c.toUpperCase());
       session.bookingState = { ...bookingState, patientName: name };
       return `Thank you, ${name}! Which service would you like to book? Here are our services:\n\n${await getServicesList()}\n\nPlease tell me the service you need.`;
     }
@@ -141,6 +141,20 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       };
       return `Great choice! ${matched.name} - that takes about ${matched.durationMinutes} minutes.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
     }
+
+    const historyText = session.history.map((m) => m.content).join(" ").toLowerCase();
+    const historyMatch = services.find(
+      (s) => historyText.includes(s.name.toLowerCase()),
+    );
+    if (historyMatch) {
+      session.bookingState = {
+        ...bookingState,
+        serviceId: historyMatch.id,
+        serviceName: historyMatch.name,
+      };
+      return `Great choice! ${historyMatch.name} - that takes about ${historyMatch.durationMinutes} minutes.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
+    }
+
     return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
   }
 
