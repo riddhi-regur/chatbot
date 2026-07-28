@@ -54,7 +54,7 @@
       if (e.key === 'Enter') sendMessage();
     });
 
-    addBotMessage(CONFIG.greeting);
+    loadHistory();
   }
 
   function toggleChat() {
@@ -96,6 +96,29 @@
       `<div class="clinicbot-msg ${m.role}">${m.text.replace(/\n/g, '<br>')}</div>`
     ).join('');
     el.scrollTop = el.scrollHeight;
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(
+        `${CONFIG.apiUrl}/chat/history?visitorId=${encodeURIComponent(visitorId)}`,
+      );
+      const data = await res.json();
+
+      if (res.ok && data.messages && data.messages.length > 0) {
+        data.messages.forEach((m) => {
+          if (m.role === 'user') {
+            addUserMessage(m.content);
+          } else {
+            addBotMessage(m.content);
+          }
+        });
+      } else {
+        addBotMessage(CONFIG.greeting);
+      }
+    } catch {
+      addBotMessage(CONFIG.greeting);
+    }
   }
 
   async function sendMessage() {

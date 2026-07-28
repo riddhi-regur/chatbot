@@ -1,4 +1,4 @@
-import { processMessage, endSession } from '../services/chat.service.js';
+import { processMessage, endSession, getHistory } from '../services/chat.service.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function sendMessage(req, res, next) {
@@ -29,6 +29,19 @@ export async function closeSession(req, res, next) {
       await endSession(visitorId);
     }
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getChatHistory(req, res, next) {
+  try {
+    const { visitorId } = req.query;
+    if (!visitorId) {
+      return res.status(400).json({ error: 'visitorId is required' });
+    }
+    const messages = await getHistory(visitorId);
+    res.json({ messages });
   } catch (err) {
     next(err);
   }

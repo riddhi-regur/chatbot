@@ -416,3 +416,65 @@ export async function endSession(visitorId) {
     chatSessions.delete(visitorId);
   }
 }
+
+export async function getHistory(visitorId) {
+  const prisma = getPrisma();
+  const sessions = await prisma.chatSession.findMany({
+    where: { visitorId },
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, role: true, content: true, intent: true, createdAt: true },
+      },
+    },
+    orderBy: { startedAt: "desc" },
+  });
+
+  if (sessions.length === 0) return [];
+
+  return sessions.flatMap((s) =>
+    s.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      intent: m.intent,
+      createdAt: m.createdAt,
+    })),
+  );
+}
+
+export async function getAllSessions({ page = 1, limit = 20, visitorId } = {}) {
+  const prisma = getPrisma();
+  const where = visitorId ? { visitorId: { contains: visitorId, mode: "insensitive" } } : {};
+
+  const [sessions, total] = await Promise.all([
+    prisma.chatSession.findMany({
+      where,
+      include: {
+        messages: {
+          orderBy: { createdAt: "asc" },
+          select: { id: true, role: true, content: true, intent: true, createdAt: true },
+        },
+      },
+      orderBy: { startedAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.chatSession.count({ where }),
+  ]);
+
+  return {
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      visitorId: s.visitorId,
+      startedAt: s.startedAt,
+      endedAt: s.endedAt,
+      messageCount: s.messages.length,
+      intents: [...new Set(s.messages.map((m) => m.intent).filter(Boolean))],
+      messages: s.messages,
+    })),
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  };
+}

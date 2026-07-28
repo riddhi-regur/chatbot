@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { getPrisma } from '../config/database.js';
 import { checkOllamaHealth } from '../config/ollama.js';
+import { getAllSessions } from '../services/chat.service.js';
 
 const router = Router();
 
@@ -34,6 +35,19 @@ router.get('/dashboard', authMiddleware, async (req, res, next) => {
       chatSessions,
       ollamaStatus,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/chat-sessions', authMiddleware, async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const visitorId = req.query.visitorId || undefined;
+
+    const result = await getAllSessions({ page, limit, visitorId });
+    res.json(result);
   } catch (err) {
     next(err);
   }
