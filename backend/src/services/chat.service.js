@@ -53,7 +53,7 @@ export async function processMessage(visitorId, userMessage) {
     );
   } else if (session.statusLookup) {
     session.statusLookup = false;
-    response = await handleBookingStatusLookup(message, visitorId);
+    response = await handleBookingStatusLookup(userMessage, visitorId);
   } else if (intent === "book_appointment") {
     response = await handleBookingIntent(
       visitorId,
@@ -78,7 +78,7 @@ export async function processMessage(visitorId, userMessage) {
       "contact",
     ].includes(intent)
   ) {
-    response = await handleKnowledgeIntent(userMessage, intent, entities);
+    response = await handleKnowledgeIntent(userMessage, intent, entities, session);
   } else {
     response = await handleGeneralIntent(userMessage, session);
   }
@@ -343,7 +343,7 @@ async function handleBookingStatusLookup(name, visitorId) {
   return response.trim();
 }
 
-async function handleKnowledgeIntent(message, intent, entities) {
+async function handleKnowledgeIntent(message, intent, entities, session) {
   const results = await searchKnowledge(message, 3);
 
   if (results.length > 0) {
@@ -363,6 +363,53 @@ async function handleKnowledgeIntent(message, intent, entities) {
     return `Our doctors:\n${doctors.map((d) => `- ${d.name} - ${d.specialization}`).join("\n")}`;
   }
 
+  if (["contact", "hours", "pricing"].includes(intent)) {
+    const ollamaAvailable = await checkOllamaHealth();
+    if (ollamaAvailable) {
+      const systemPrompt = buildPromptContext(
+        intent,
+        entities,
+        results,
+        session ? session.history.slice(-6) : [],
+      );
+      return await generateChatResponse([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ]);
+    }
+
+    const keywords = {
+      contact: ["phone", "email", "address", "location", "where", "parking"],
+      hours: ["open", "close", "hours", "timing", "monday", "friday", "saturday", "sunday"],
+      pricing: ["price", "cost", "payment", "insurance", "fee", "charge"],
+    };
+    const categoryMap = { contact: "general", hours: "general", pricing: "policy" };
+    const kbEntries = await prisma.knowledgeBase.findMany({
+      where: {
+        category: categoryMap[intent],
+        content: { contains: keywords[intent][0], mode: "insensitive" },
+      },
+      take: 3,
+    });
+    if (kbEntries.length > 0) {
+      return kbEntries.map((e) => e.content).join("\n\n");
+    }
+  }
+
+  const ollamaAvailable = await checkOllamaHealth();
+  if (ollamaAvailable) {
+    const systemPrompt = buildPromptContext(
+      intent,
+      entities,
+      results,
+      session ? session.history.slice(-6) : [],
+    );
+    return await generateChatResponse([
+      { role: "system", content: systemPrompt },
+      { role: "user", content: message },
+    ]);
+  }
+
   return "I'm not sure about that. Could you rephrase your question? I can help with services, doctors, appointments, and general clinic information.";
 }
 
@@ -370,7 +417,7 @@ async function handleGeneralIntent(message, session) {
   const knowledgeResults = await searchKnowledge(message, 3);
 
   const ollamaAvailable = await checkOllamaHealth();
-  if (ollamaAvailable && knowledgeResults.length > 0) {
+  if (ollamaAvailable) {
     const systemPrompt = buildPromptContext(
       "general",
       {},
