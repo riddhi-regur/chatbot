@@ -187,16 +187,26 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       const time = `${hour}:${min}`;
 
       session.bookingState = { ...bookingState, time };
+      return "Thanks! One more thing — please provide your phone number so we can contact you regarding your appointment.";
+    }
+    return `Available time slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}\n\nPlease pick a time.`;
+  }
+
+  if (!bookingState.patientPhone) {
+    const phone = entities.phone || message.match(/\+?\d[\d\s\-().]{7,}\d/)?.[0];
+    if (phone) {
+      session.bookingState = { ...bookingState, patientPhone: phone };
       return (
         `Please confirm your booking:\n\n` +
         `- Patient: ${bookingState.patientName}\n` +
+        `- Phone: ${phone}\n` +
         `- Service: ${bookingState.serviceName}\n` +
         `- Date: ${bookingState.date}\n` +
-        `- Time: ${time}\n\n` +
+        `- Time: ${bookingState.time}\n\n` +
         `Type "confirm" to book, or "cancel" to start over.`
       );
     }
-    return `Available time slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}\n\nPlease pick a time.`;
+    return "Please provide your phone number (e.g., +1-555-0123) so we can contact you.";
   }
 
   if (/confirm|yes|book it/i.test(message)) {
@@ -209,16 +219,20 @@ async function handleBookingIntent(visitorId, message, entities, session) {
 
       const appointment = await appointmentService.createAppointment({
         patientName: bookingState.patientName,
+        patientPhone: bookingState.patientPhone,
         doctorId,
         serviceId: bookingState.serviceId,
         date: bookingState.date,
         time: bookingState.time,
+        visitorId,
       });
 
       session.bookingState = null;
       return (
         `Your appointment has been booked!\n\n` +
         `Booking #${appointment.id}\n` +
+        `Patient: ${bookingState.patientName}\n` +
+        `Phone: ${bookingState.patientPhone}\n` +
         `Doctor: ${appointment.doctor.name}\n` +
         `Service: ${appointment.service.name}\n` +
         `Date: ${bookingState.date}\n` +
@@ -477,4 +491,31 @@ export async function getAllSessions({ page = 1, limit = 20, visitorId } = {}) {
     page,
     totalPages: Math.ceil(total / limit),
   };
+}
+
+export async function sendAppointmentNotification(visitorId, message) {
+  const prisma = getPrisma();
+  const sessions = await prisma.chatSession.findMany({
+    where: { visitorId },
+    orderBy: { startedAt: "desc" },
+    take: 1,
+  });
+  if (sessions.length === 0) return null;
+
+  const dbSession = sessions[0];
+  const chatMessage = await prisma.chatMessage.create({
+    data: {
+      sessionId: dbSession.id,
+      role: "assistant",
+      content: message,
+      intent: "notification",
+    },
+  });
+
+  if (chatSessions.has(visitorId)) {
+    const session = chatSessions.get(visitorId);
+    session.history.push({ role: "assistant", content: message });
+  }
+
+  return chatMessage;
 }

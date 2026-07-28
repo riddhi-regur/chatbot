@@ -68,6 +68,7 @@ export async function createAppointment(data) {
       appointmentTime: new Date(`1970-01-01T${data.time}`),
       status: 'booked',
       notes: data.notes || null,
+      visitorId: data.visitorId || null,
     },
     include: {
       doctor: true,
