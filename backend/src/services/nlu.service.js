@@ -14,6 +14,8 @@ const INTENT_PATTERNS = {
     /want to book/i, /want to schedule/i, /set up.*appointment/i,
     /need.*appointment/i, /fix.*appointment/i, /appointment book/i,
     /i want to see/i, /i need to see/i, /visit/i,
+    /i want (?:a|an|the|to)\b/i, /i need (?:a|an|the|to)\b/i,
+    /i'd like/i, /looking for/i,
   ],
   check_availability: [
     /available/i, /availability/i, /when is/i, /open/i, /openings/i,
