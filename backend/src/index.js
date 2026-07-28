@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { initDatabase } from './config/database.js';
 import { initPgVector } from './config/pgvector.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -11,6 +13,9 @@ import doctorRoutes from './routes/doctor.routes.js';
 import appointmentRoutes from './routes/appointment.routes.js';
 import knowledgeRoutes from './routes/knowledge.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +34,9 @@ app.use('/api/admin', adminRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+const widgetPath = path.resolve(__dirname, '../../widget');
+app.use('/widget', express.static(widgetPath));
 
 app.use(errorHandler);
 

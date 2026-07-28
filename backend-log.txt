@@ -1,4 +1,0 @@
-pgvector extension enabled
-Database connected successfully
-pgvector initialized successfully
-Server running on http://localhost:4001
