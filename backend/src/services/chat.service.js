@@ -142,9 +142,13 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       return `Great choice! ${matched.name} - that takes about ${matched.durationMinutes} minutes.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
     }
 
-    const historyText = session.history.map((m) => m.content).join(" ").toLowerCase();
+    const userText = session.history
+      .filter((m) => m.role === "user")
+      .map((m) => m.content)
+      .join(" ")
+      .toLowerCase();
     const historyMatch = services.find(
-      (s) => historyText.includes(s.name.toLowerCase()),
+      (s) => userText.includes(s.name.toLowerCase()),
     );
     if (historyMatch) {
       session.bookingState = {
@@ -158,7 +162,42 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
   }
 
+  if (/change|different|wrong|not this|go back|switch/i.test(message)) {
+    const services = await prisma.service.findMany({
+      where: { isActive: true },
+    });
+    const msgLower = message.toLowerCase();
+    const newService = services.find((s) => {
+      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      return searchable.includes(msgLower);
+    });
+    if (newService && newService.id !== bookingState.serviceId) {
+      session.bookingState = {
+        ...bookingState,
+        serviceId: newService.id,
+        serviceName: newService.name,
+      };
+      return `Switched to ${newService.name} - that takes about ${newService.durationMinutes} minutes.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
+    }
+    session.bookingState = {
+      ...bookingState,
+      serviceId: undefined,
+      serviceName: undefined,
+    };
+    return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
+  }
+
   if (!bookingState.date) {
+    if (/change|different|wrong|not this|go back|switch/i.test(message)) {
+      session.bookingState = {
+        ...bookingState,
+        date: undefined,
+        time: undefined,
+        patientPhone: undefined,
+      };
+      return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
+    }
+
     let date = null;
     const today = new Date();
 
@@ -192,12 +231,16 @@ async function handleBookingIntent(visitorId, message, entities, session) {
   if (!bookingState.time) {
     const timeMatch =
       message.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i) ||
-      message.match(/(\d{1,2})\s*(am|pm)/i);
+      message.match(/(\d{1,2})\s*(am|pm)/i) ||
+      message.match(/^(\d{1,2})$/);
     if (timeMatch) {
       let hour = parseInt(timeMatch[1]);
       const min = timeMatch[2] ? timeMatch[2] : "00";
       if (timeMatch[3]?.toLowerCase() === "pm" && hour < 12) hour += 12;
       if (timeMatch[3]?.toLowerCase() === "am" && hour === 12) hour = 0;
+      if (hour < 9 || hour >= 17) {
+        return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}`;
+      }
       const time = `${hour}:${min}`;
 
       session.bookingState = { ...bookingState, time };
@@ -207,6 +250,18 @@ async function handleBookingIntent(visitorId, message, entities, session) {
   }
 
   if (!bookingState.patientPhone) {
+    if (/change service|switch service|different service|not root canal|not checkup|not cleaning/i.test(message)) {
+      session.bookingState = {
+        ...bookingState,
+        serviceId: undefined,
+        serviceName: undefined,
+        date: undefined,
+        time: undefined,
+        patientPhone: undefined,
+      };
+      return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
+    }
+
     const phone = entities.phone || message.match(/\+?\d[\d\s\-().]{7,}\d/)?.[0];
     if (phone) {
       session.bookingState = { ...bookingState, patientPhone: phone };
@@ -221,6 +276,37 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       );
     }
     return "Please provide your phone number (e.g., +1-555-0123) so we can contact you.";
+  }
+
+  if (/\b(change|edit|fix|different|wrong|not this|go back)\b/i.test(message)) {
+    const services = await prisma.service.findMany({
+      where: { isActive: true },
+    });
+    const msgLower = message.toLowerCase();
+    const newService = services.find((s) => {
+      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      return searchable.includes(msgLower);
+    });
+    if (newService) {
+      session.bookingState = {
+        ...bookingState,
+        serviceId: newService.id,
+        serviceName: newService.name,
+        date: undefined,
+        time: undefined,
+        patientPhone: undefined,
+      };
+      return `Switched to ${newService.name} - that takes about ${newService.durationMinutes} minutes.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
+    }
+    session.bookingState = {
+      ...bookingState,
+      serviceId: undefined,
+      serviceName: undefined,
+      date: undefined,
+      time: undefined,
+      patientPhone: undefined,
+    };
+    return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
   }
 
   if (/confirm|yes|book it/i.test(message)) {
