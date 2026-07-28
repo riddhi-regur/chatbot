@@ -108,10 +108,10 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     }
 
     const bareName = message.trim().match(
-      /^([A-Za-z]+(?:\s+[A-Za-z]+)*)$/,
+      /^[A-Z][a-z]{1,30}$/,
     );
-    if (bareName && bareName[1].length >= 2 && bareName[1].length <= 50) {
-      const name = bareName[1].replace(/\b\w/g, (c) => c.toUpperCase());
+    if (bareName) {
+      const name = bareName[0];
       session.bookingState = { ...bookingState, patientName: name };
       return `Thank you, ${name}! Which service would you like to book? Here are our services:\n\n${await getServicesList()}\n\nPlease tell me the service you need.`;
     }
@@ -123,9 +123,11 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     const services = await prisma.service.findMany({
       where: { isActive: true },
     });
-    const matched = services.find((s) =>
-      message.toLowerCase().includes(s.name.toLowerCase()),
-    );
+    const msgLower = message.toLowerCase();
+    const matched = services.find((s) => {
+      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      return searchable.includes(msgLower);
+    });
     if (matched) {
       session.bookingState = {
         ...bookingState,

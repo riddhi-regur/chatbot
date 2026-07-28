@@ -2,7 +2,7 @@ import { getPrisma } from '../config/database.js';
 
 export async function getAvailableSlots(doctorId, date) {
   const prisma = getPrisma();
-  const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'lowercase' });
+  const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
   const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
   if (!doctor) throw new Error('Doctor not found');
