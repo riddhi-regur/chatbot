@@ -25,6 +25,12 @@ const INTENT_PATTERNS = {
     /cancel.*appointment/i, /cancel booking/i, /reschedule/i,
     /change.*appointment/i, /modify.*appointment/i,
   ],
+  booking_status: [
+    /booking status/i, /appointment status/i, /check booking/i,
+    /check appointment/i, /my booking/i, /my appointment/i,
+    /track booking/i, /track appointment/i, /booking details/i,
+    /where.*appointment/i, /did.*appointment/i,
+  ],
   pricing: [
     /how much/i, /price/i, /cost/i, /fee/i, /charges/i, /payment/i,
     /insurance/i,

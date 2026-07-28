@@ -51,6 +51,9 @@ export async function processMessage(visitorId, userMessage) {
       entities,
       session,
     );
+  } else if (session.statusLookup) {
+    session.statusLookup = false;
+    response = await handleBookingStatusLookup(message, visitorId);
   } else if (intent === "book_appointment") {
     response = await handleBookingIntent(
       visitorId,
@@ -58,6 +61,8 @@ export async function processMessage(visitorId, userMessage) {
       entities,
       session,
     );
+  } else if (intent === "booking_status") {
+    response = await handleBookingStatusIntent(session);
   } else if (intent === "check_availability") {
     response = await handleAvailabilityIntent(entities);
   } else if (intent === "cancel_appointment") {
@@ -214,7 +219,7 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       return (
         `Your appointment has been booked!\n\n` +
         `Booking #${appointment.id}\n` +
-        `Doctor: Dr. ${appointment.doctor.name}\n` +
+        `Doctor: ${appointment.doctor.name}\n` +
         `Service: ${appointment.service.name}\n` +
         `Date: ${bookingState.date}\n` +
         `Time: ${bookingState.time}\n` +
@@ -245,19 +250,83 @@ async function handleAvailabilityIntent(entities) {
     if (doctor) {
       const date = entities.date || new Date().toISOString().split("T")[0];
       return (
-        `Dr. ${doctor.name} (${doctor.specialization}) - Availability for ${date}:\n` +
+        `${doctor.name} (${doctor.specialization}) - Availability for ${date}:\n` +
         `${await getAvailableSlotsText(doctor.id, date)}`
       );
     }
-    return `Doctor "${entities.doctorName}" not found. Our doctors:\n${doctors.map((d) => `- Dr. ${d.name} (${d.specialization})`).join("\n")}`;
+    return `Doctor "${entities.doctorName}" not found. Our doctors:\n${doctors.map((d) => `- ${d.name} (${d.specialization})`).join("\n")}`;
   }
 
   return `Our doctors and their availability:\n${doctors
     .map(
       (d) =>
-        `- Dr. ${d.name} (${d.specialization}) - Days: ${(d.availableDays || []).join(", ")}`,
+        `- ${d.name} (${d.specialization}) - Days: ${(d.availableDays || []).join(", ")}`,
     )
     .join("\n")}\n\nWould you like to check a specific doctor's availability?`;
+}
+
+async function handleBookingStatusIntent(session) {
+  session.statusLookup = true;
+  return "Could you please provide your name so I can look up your appointment status?";
+}
+
+async function handleBookingStatusLookup(name, visitorId) {
+  const prisma = getPrisma();
+  const appointments = await prisma.appointment.findMany({
+    where: {
+      patientName: { contains: name.trim(), mode: "insensitive" },
+    },
+    include: { doctor: true, service: true },
+    orderBy: [{ appointmentDate: "desc" }, { appointmentTime: "desc" }],
+  });
+
+  if (appointments.length === 0) {
+    return `No appointments found for "${name}". Would you like to book a new appointment?`;
+  }
+
+  const upcoming = appointments.filter(
+    (a) => new Date(a.appointmentDate) >= new Date(new Date().toDateString()),
+  );
+  const past = appointments.filter(
+    (a) => new Date(a.appointmentDate) < new Date(new Date().toDateString()),
+  );
+
+  let response = `Here are the appointments for ${name}:\n\n`;
+
+  if (upcoming.length > 0) {
+    response += "**Upcoming:**\n";
+    upcoming.forEach((a) => {
+      const date = new Date(a.appointmentDate).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const time = new Date(a.appointmentTime).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      response += `• Booking #${a.id} — ${a.service.name} with ${a.doctor.name} on ${date} at ${time} [${a.status}]\n`;
+    });
+    response += "\n";
+  }
+
+  if (past.length > 0) {
+    response += "**Past:**\n";
+    past.forEach((a) => {
+      const date = new Date(a.appointmentDate).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+      const time = new Date(a.appointmentTime).toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      response += `• Booking #${a.id} — ${a.service.name} with ${a.doctor.name} on ${date} at ${time} [${a.status}]\n`;
+    });
+  }
+
+  return response.trim();
 }
 
 async function handleKnowledgeIntent(message, intent, entities) {
@@ -277,7 +346,7 @@ async function handleKnowledgeIntent(message, intent, entities) {
   }
   if (intent === "doctor_inquiry") {
     const doctors = await prisma.doctor.findMany({ where: { isActive: true } });
-    return `Our doctors:\n${doctors.map((d) => `- Dr. ${d.name} - ${d.specialization}`).join("\n")}`;
+    return `Our doctors:\n${doctors.map((d) => `- ${d.name} - ${d.specialization}`).join("\n")}`;
   }
 
   return "I'm not sure about that. Could you rephrase your question? I can help with services, doctors, appointments, and general clinic information.";
