@@ -35,7 +35,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-const widgetPath = path.resolve(__dirname, '../../widget');
+const widgetPath = process.env.WIDGET_PATH || path.resolve(__dirname, '../../widget');
 app.use('/widget', express.static(widgetPath));
 
 app.use(errorHandler);

@@ -4,14 +4,15 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY backend/package.json backend/package-lock.json ./
 RUN npm ci
 
-COPY prisma ./prisma
+COPY backend/prisma ./prisma
 RUN npx prisma generate
 
-COPY src ./src
-COPY start.sh ./
+COPY backend/src ./src
+COPY widget ./widget
+COPY backend/start.sh ./
 RUN chmod +x start.sh
 EXPOSE 4001
 
