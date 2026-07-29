@@ -11,6 +11,7 @@ COPY backend/prisma ./prisma
 RUN npx prisma generate
 
 COPY backend/src ./src
+COPY backend/scripts ./scripts
 COPY widget ./widget
 COPY backend/start.sh ./
 RUN chmod +x start.sh
