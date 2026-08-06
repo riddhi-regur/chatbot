@@ -53,7 +53,7 @@ export async function processMessage(visitorId, userMessage) {
     );
   } else if (session.statusLookup) {
     session.statusLookup = false;
-    response = await handleBookingStatusLookup(userMessage, visitorId);
+    response = await handleBookingStatusLookup(userMessage, visitorId, session);
   } else if (intent === "book_appointment") {
     response = await handleBookingIntent(
       visitorId,
@@ -62,7 +62,7 @@ export async function processMessage(visitorId, userMessage) {
       session,
     );
   } else if (intent === "booking_status") {
-    response = await handleBookingStatusIntent(session);
+    response = await handleBookingStatusIntent(session, visitorId);
   } else if (intent === "check_availability") {
     response = await handleAvailabilityIntent(entities);
   } else if (intent === "cancel_appointment") {
@@ -387,21 +387,116 @@ async function handleAvailabilityIntent(entities) {
     .join("\n")}\n\nWould you like to check a specific doctor's availability?`;
 }
 
-async function handleBookingStatusIntent(session) {
+async function handleBookingStatusIntent(session, visitorId) {
+  const prisma = getPrisma();
+  const rows = await prisma.appointment.findMany({
+    where: { visitorId },
+    select: { patientName: true },
+  });
+
+  const names = [
+    ...new Set(rows.map((r) => r.patientName?.trim()).filter(Boolean)),
+  ];
+
+  if (names.length === 1) {
+    const appointments = await getAppointmentsForName(names[0], visitorId);
+    return buildAppointmentsResponse(names[0], appointments);
+  }
+
   session.statusLookup = true;
-  return "Could you please provide your name so I can look up your appointment status?";
+  session.statusLookupStep = "name";
+  session.statusLookupName = null;
+
+  if (names.length === 0) {
+    return "Could you please provide the name you booked under?";
+  }
+
+  return `I found bookings under multiple names (${names.join(", ")}). Which name would you like me to check?`;
 }
 
-async function handleBookingStatusLookup(name, visitorId) {
+async function handleBookingStatusLookup(message, visitorId, session) {
+  if (session.statusLookupStep === "phone") {
+    const phone = extractPhone(message);
+    if (!phone) {
+      session.statusLookupStep = "phone";
+      return "Please provide the phone number used for the booking (e.g., +1-555-0123).";
+    }
+    const appointments = await getAppointmentsByNameAndPhone(
+      session.statusLookupName,
+      phone,
+    );
+    if (appointments.length === 0) {
+      session.statusLookup = false;
+      session.statusLookupStep = null;
+      session.statusLookupName = null;
+      return `No appointments found for "${session.statusLookupName}" with that phone number. Would you like to book a new appointment?`;
+    }
+    session.statusLookup = false;
+    session.statusLookupStep = null;
+    session.statusLookupName = null;
+    return buildAppointmentsResponse(appointments[0].patientName, appointments);
+  }
+
+  const name = extractPatientName(message);
+  const scoped = await getAppointmentsForName(name, visitorId);
+  if (scoped.length > 0) {
+    return buildAppointmentsResponse(name, scoped);
+  }
+
+  session.statusLookup = true;
+  session.statusLookupStep = "phone";
+  session.statusLookupName = name;
+  return `I couldn't find a booking under "${name}" on this device. To verify, please provide the phone number used for the booking.`;
+}
+
+async function getAppointmentsForName(name, visitorId) {
   const prisma = getPrisma();
-  const appointments = await prisma.appointment.findMany({
+  return await prisma.appointment.findMany({
     where: {
-      patientName: { contains: name.trim(), mode: "insensitive" },
+      patientName: { contains: name, mode: "insensitive" },
+      visitorId,
     },
     include: { doctor: true, service: true },
     orderBy: [{ appointmentDate: "desc" }, { appointmentTime: "desc" }],
   });
+}
 
+async function getAppointmentsByNameAndPhone(name, phone) {
+  const prisma = getPrisma();
+  const normalized = normalizePhone(phone);
+  const matches = await prisma.appointment.findMany({
+    where: { patientName: { contains: name, mode: "insensitive" } },
+    include: { doctor: true, service: true },
+    orderBy: [{ appointmentDate: "desc" }, { appointmentTime: "desc" }],
+  });
+  return matches.filter(
+    (a) => a.patientPhone && normalizePhone(a.patientPhone) === normalized,
+  );
+}
+
+function extractPatientName(message) {
+  const cleaned = message
+    .replace(
+      /\b(?:my name is|my name's|i am|i'm|name is)\b/i,
+      "",
+    )
+    .replace(/[^A-Za-z\s]+/g, " ")
+    .trim();
+  return cleaned.length > 0 ? cleaned : message.trim();
+}
+
+function extractPhone(message) {
+  const match = message.match(
+    /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/,
+  );
+  return match ? match[0] : null;
+}
+
+function normalizePhone(phone) {
+  return String(phone).replace(/\D/g, "");
+}
+
+function buildAppointmentsResponse(name, appointments) {
   if (appointments.length === 0) {
     return `No appointments found for "${name}". Would you like to book a new appointment?`;
   }
