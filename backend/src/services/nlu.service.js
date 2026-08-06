@@ -10,7 +10,7 @@ const INTENT_PATTERNS = {
     /physician/i, /specialist/i,
   ],
   book_appointment: [
-    /book.*appointment/i, /schedule.*appointment/i, /make.*appointment/i,
+    /book\b/i, /book.*appointment/i, /schedule.*appointment/i, /make.*appointment/i,
     /want to book/i, /want to schedule/i, /set up.*appointment/i,
     /need.*appointment/i, /fix.*appointment/i, /appointment book/i,
     /i want to see/i, /i need to see/i, /visit/i,

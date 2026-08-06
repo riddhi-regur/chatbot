@@ -15,9 +15,15 @@ export async function processMessage(visitorId, userMessage) {
 
   let session = chatSessions.get(visitorId);
   if (!session) {
-    const dbSession = await prisma.chatSession.create({
-      data: { visitorId },
+    const existing = await prisma.chatSession.findFirst({
+      where: { visitorId, endedAt: null },
+      orderBy: { startedAt: "desc" },
     });
+    const dbSession =
+      existing ||
+      (await prisma.chatSession.create({
+        data: { visitorId },
+      }));
     session = { dbSession, history: [] };
     chatSessions.set(visitorId, session);
   }
@@ -103,6 +109,8 @@ export async function processMessage(visitorId, userMessage) {
   return { response, intent, sessionId: session.dbSession.id };
 }
 
+const NAME_STOPWORDS = /\b(today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+
 async function handleBookingIntent(visitorId, message, entities, session) {
   const prisma = getPrisma();
   if (!session.bookingState) session.bookingState = {};
@@ -112,15 +120,31 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     const nameMatch = message.match(
       /(?:i'm|i am|my name is|name)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
     );
-    if (nameMatch) {
-      session.bookingState = { ...bookingState, patientName: nameMatch[1] };
-      return `Thank you, ${nameMatch[1]}! Which service would you like to book? Here are our services:\n\n${await getServicesList()}\n\nPlease tell me the service you need.`;
-    }
-
+    const forMatch = message.match(/\bfor\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
     const bareName = message.trim().match(/^[A-Za-z]{2,30}$/);
-    if (bareName) {
-      const name = bareName[0].replace(/^\w/, (c) => c.toUpperCase());
+    const name =
+      nameMatch?.[1] ||
+      (forMatch && !NAME_STOPWORDS.test(forMatch[1]) ? forMatch[1] : null) ||
+      (bareName && !NAME_STOPWORDS.test(bareName[0])
+        ? bareName[0].replace(/^\w/, (c) => c.toUpperCase())
+        : null);
+
+    if (name) {
       session.bookingState = { ...bookingState, patientName: name };
+
+      if (/\bsame\b/i.test(message)) {
+        const prev = await getLastServiceForVisitor(visitorId);
+        if (prev) {
+          session.bookingState = {
+            ...bookingState,
+            patientName: name,
+            serviceId: prev.serviceId,
+            serviceName: prev.serviceName,
+          };
+          return `Great choice! ${prev.serviceName} - same service as your last appointment.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
+        }
+      }
+
       return `Thank you, ${name}! Which service would you like to book? Here are our services:\n\n${await getServicesList()}\n\nPlease tell me the service you need.`;
     }
 
@@ -128,6 +152,18 @@ async function handleBookingIntent(visitorId, message, entities, session) {
   }
 
   if (!bookingState.serviceId) {
+    if (/\bsame\b/i.test(message)) {
+      const prev = await getLastServiceForVisitor(visitorId);
+      if (prev) {
+        session.bookingState = {
+          ...bookingState,
+          serviceId: prev.serviceId,
+          serviceName: prev.serviceName,
+        };
+        return `Great choice! ${prev.serviceName} - same service as your last appointment.\n\nWhat date would you like? (e.g., tomorrow, 2024-01-15)`;
+      }
+    }
+
     const services = await prisma.service.findMany({
       where: { isActive: true },
     });
@@ -359,6 +395,17 @@ async function handleBookingIntent(visitorId, message, entities, session) {
   }
 
   return 'Please type "confirm" to book or "cancel" to start over.';
+}
+
+async function getLastServiceForVisitor(visitorId) {
+  const prisma = getPrisma();
+  const last = await prisma.appointment.findFirst({
+    where: { visitorId },
+    orderBy: [{ appointmentDate: "desc" }, { appointmentTime: "desc" }],
+    include: { service: true },
+  });
+  if (!last?.service) return null;
+  return { serviceId: last.serviceId, serviceName: last.service.name };
 }
 
 async function handleAvailabilityIntent(entities) {
@@ -710,7 +757,7 @@ export async function getHistory(visitorId) {
         },
       },
     },
-    orderBy: { startedAt: "desc" },
+    orderBy: { startedAt: "asc" },
   });
 
   if (sessions.length === 0) return [];
