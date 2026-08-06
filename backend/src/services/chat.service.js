@@ -33,14 +33,14 @@ export async function processMessage(visitorId, userMessage) {
   const { intent, confidence } = detectIntent(userMessage);
   const entities = extractEntities(userMessage);
 
-  await prisma.chatMessage.create({
-    data: {
-      sessionId: session.dbSession.id,
-      role: "assistant",
-      content: `[intent:${intent}]`,
-      intent,
-    },
-  });
+  // await prisma.chatMessage.create({
+  //   data: {
+  //     sessionId: session.dbSession.id,
+  //     role: "assistant",
+  //     content: `[intent:${intent}]`,
+  //     intent,
+  //   },
+  // });
 
   let response = "";
 
@@ -78,7 +78,12 @@ export async function processMessage(visitorId, userMessage) {
       "contact",
     ].includes(intent)
   ) {
-    response = await handleKnowledgeIntent(userMessage, intent, entities, session);
+    response = await handleKnowledgeIntent(
+      userMessage,
+      intent,
+      entities,
+      session,
+    );
   } else {
     response = await handleGeneralIntent(userMessage, session);
   }
@@ -112,9 +117,7 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       return `Thank you, ${nameMatch[1]}! Which service would you like to book? Here are our services:\n\n${await getServicesList()}\n\nPlease tell me the service you need.`;
     }
 
-    const bareName = message.trim().match(
-      /^[A-Za-z]{2,30}$/,
-    );
+    const bareName = message.trim().match(/^[A-Za-z]{2,30}$/);
     if (bareName) {
       const name = bareName[0].replace(/^\w/, (c) => c.toUpperCase());
       session.bookingState = { ...bookingState, patientName: name };
@@ -130,7 +133,7 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     });
     const msgLower = message.toLowerCase();
     const matched = services.find((s) => {
-      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      const searchable = `${s.name} ${s.description || ""}`.toLowerCase();
       return searchable.includes(msgLower);
     });
     if (matched) {
@@ -147,8 +150,8 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       .map((m) => m.content)
       .join(" ")
       .toLowerCase();
-    const historyMatch = services.find(
-      (s) => userText.includes(s.name.toLowerCase()),
+    const historyMatch = services.find((s) =>
+      userText.includes(s.name.toLowerCase()),
     );
     if (historyMatch) {
       session.bookingState = {
@@ -168,7 +171,7 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     });
     const msgLower = message.toLowerCase();
     const newService = services.find((s) => {
-      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      const searchable = `${s.name} ${s.description || ""}`.toLowerCase();
       return searchable.includes(msgLower);
     });
     if (newService && newService.id !== bookingState.serviceId) {
@@ -250,7 +253,11 @@ async function handleBookingIntent(visitorId, message, entities, session) {
   }
 
   if (!bookingState.patientPhone) {
-    if (/change service|switch service|different service|not root canal|not checkup|not cleaning/i.test(message)) {
+    if (
+      /change service|switch service|different service|not root canal|not checkup|not cleaning/i.test(
+        message,
+      )
+    ) {
       session.bookingState = {
         ...bookingState,
         serviceId: undefined,
@@ -262,7 +269,8 @@ async function handleBookingIntent(visitorId, message, entities, session) {
       return `Which service would you like? Here are our services:\n\n${await getServicesList()}`;
     }
 
-    const phone = entities.phone || message.match(/\+?\d[\d\s\-().]{7,}\d/)?.[0];
+    const phone =
+      entities.phone || message.match(/\+?\d[\d\s\-().]{7,}\d/)?.[0];
     if (phone) {
       session.bookingState = { ...bookingState, patientPhone: phone };
       return (
@@ -284,7 +292,7 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     });
     const msgLower = message.toLowerCase();
     const newService = services.find((s) => {
-      const searchable = `${s.name} ${s.description || ''}`.toLowerCase();
+      const searchable = `${s.name} ${s.description || ""}`.toLowerCase();
       return searchable.includes(msgLower);
     });
     if (newService) {
@@ -480,10 +488,23 @@ async function handleKnowledgeIntent(message, intent, entities, session) {
 
     const keywords = {
       contact: ["phone", "email", "address", "location", "where", "parking"],
-      hours: ["open", "close", "hours", "timing", "monday", "friday", "saturday", "sunday"],
+      hours: [
+        "open",
+        "close",
+        "hours",
+        "timing",
+        "monday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
       pricing: ["price", "cost", "payment", "insurance", "fee", "charge"],
     };
-    const categoryMap = { contact: "general", hours: "general", pricing: "policy" };
+    const categoryMap = {
+      contact: "general",
+      hours: "general",
+      pricing: "policy",
+    };
     const kbEntries = await prisma.knowledgeBase.findMany({
       where: {
         category: categoryMap[intent],
@@ -585,7 +606,13 @@ export async function getHistory(visitorId) {
     include: {
       messages: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, role: true, content: true, intent: true, createdAt: true },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          intent: true,
+          createdAt: true,
+        },
       },
     },
     orderBy: { startedAt: "desc" },
@@ -606,7 +633,9 @@ export async function getHistory(visitorId) {
 
 export async function getAllSessions({ page = 1, limit = 20, visitorId } = {}) {
   const prisma = getPrisma();
-  const where = visitorId ? { visitorId: { contains: visitorId, mode: "insensitive" } } : {};
+  const where = visitorId
+    ? { visitorId: { contains: visitorId, mode: "insensitive" } }
+    : {};
 
   const [sessions, total] = await Promise.all([
     prisma.chatSession.findMany({
@@ -614,7 +643,13 @@ export async function getAllSessions({ page = 1, limit = 20, visitorId } = {}) {
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
-          select: { id: true, role: true, content: true, intent: true, createdAt: true },
+          select: {
+            id: true,
+            role: true,
+            content: true,
+            intent: true,
+            createdAt: true,
+          },
         },
       },
       orderBy: { startedAt: "desc" },
