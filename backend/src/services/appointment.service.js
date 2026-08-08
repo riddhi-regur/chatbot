@@ -1,5 +1,29 @@
 import { getPrisma } from '../config/database.js';
 
+function toDateString(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function isToday(date) {
+  return toDateString(new Date(date)) === toDateString(new Date());
+}
+
+function toMinutes(time) {
+  const [h, m] = String(time || '').split(':');
+  return parseInt(h) * 60 + parseInt(m || 0);
+}
+
+function parseAppointmentTime(time) {
+  const [h, m] = String(time || '').split(':');
+  const hour = parseInt(h);
+  const min = parseInt(m || 0);
+  if (Number.isNaN(hour)) throw new Error('Invalid appointment time');
+  return new Date(1970, 0, 1, hour, min);
+}
+
 export async function getAvailableSlots(doctorId, date) {
   const prisma = getPrisma();
   const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
@@ -30,11 +54,16 @@ export async function getAvailableSlots(doctorId, date) {
     return `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
   });
 
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const today = isToday(date);
+
   const slots = [];
   for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += 30) {
       const time = `${h}:${String(m).padStart(2, '0')}`;
-      slots.push({ time, available: !bookedTimes.includes(time) });
+      const withinGap = today && h * 60 + m < nowMinutes + 120;
+      slots.push({ time, available: !bookedTimes.includes(time) && !withinGap });
     }
   }
 
@@ -44,11 +73,18 @@ export async function getAvailableSlots(doctorId, date) {
 export async function createAppointment(data) {
   const prisma = getPrisma();
 
+  if (
+    isToday(data.date) &&
+    toMinutes(data.time) < new Date().getHours() * 60 + new Date().getMinutes() + 120
+  ) {
+    throw new Error('That time is within 2 hours of now. Please pick a later slot.');
+  }
+
   const existing = await prisma.appointment.findFirst({
     where: {
       doctorId: data.doctorId,
       appointmentDate: new Date(data.date),
-      appointmentTime: new Date(`1970-01-01T${data.time}`),
+      appointmentTime: parseAppointmentTime(data.time),
       status: { in: ['booked', 'confirmed'] },
     },
   });
@@ -65,7 +101,7 @@ export async function createAppointment(data) {
       doctorId: data.doctorId,
       serviceId: data.serviceId,
       appointmentDate: new Date(data.date),
-      appointmentTime: new Date(`1970-01-01T${data.time}`),
+      appointmentTime: parseAppointmentTime(data.time),
       status: 'booked',
       notes: data.notes || null,
       visitorId: data.visitorId || null,

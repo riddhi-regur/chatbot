@@ -241,12 +241,20 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     const time = parseTimeFromMessage(message);
 
     if (date) {
+      const avail = await appointmentService.getAvailableSlots(1, date);
+      if (!avail.available) {
+        return `I'm sorry, but the doctor isn't available on ${date}. Please choose a different date (e.g., tomorrow, monday, or a specific date like 2026-08-10).`;
+      }
+
       const updated = { ...bookingState, date };
       session.bookingState = updated;
 
       if (time) {
         if (time.hour < 9 || time.hour >= 17) {
           return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(1, date)}`;
+        }
+        if (isWithinTwoHours(date, time.hour, time.min)) {
+          return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(1, date)}`;
         }
         const timeStr = `${time.hour}:${time.min}`;
         session.bookingState = { ...updated, time: timeStr };
@@ -274,6 +282,9 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     if (time) {
       if (time.hour < 9 || time.hour >= 17) {
         return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}`;
+      }
+      if (isWithinTwoHours(bookingState.date, time.hour, time.min)) {
+        return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}`;
       }
       const timeStr = `${time.hour}:${time.min}`;
       session.bookingState = { ...bookingState, time: timeStr };
@@ -497,6 +508,13 @@ function parseDateFromMessage(message) {
   }
 
   return null;
+}
+
+function isWithinTwoHours(dateStr, hour, min) {
+  if (dateStr !== toDateString(new Date())) return false;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  return hour * 60 + parseInt(min) < nowMinutes + 120;
 }
 
 function parseTimeFromMessage(message) {
