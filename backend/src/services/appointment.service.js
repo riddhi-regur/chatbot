@@ -1,9 +1,9 @@
 import { getPrisma } from '../config/database.js';
 
 function toDateString(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -21,19 +21,23 @@ function parseAppointmentTime(time) {
   const hour = parseInt(h);
   const min = parseInt(m || 0);
   if (Number.isNaN(hour)) throw new Error('Invalid appointment time');
-  return new Date(1970, 0, 1, hour, min);
+  return new Date(Date.UTC(1970, 0, 1, hour, min));
 }
 
 export async function getAvailableSlots(doctorId, date) {
   const prisma = getPrisma();
-  const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const dayOfWeek = new Date(date).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }).toLowerCase();
 
   const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
   if (!doctor) throw new Error('Doctor not found');
 
   const days = doctor.availableDays || [];
   if (!days.includes(dayOfWeek)) {
-    return { available: false, reason: `Doctor not available on ${dayOfWeek}` };
+    return {
+      available: false,
+      reason: `Doctor not available on ${dayOfWeek}`,
+      doctor: { name: doctor.name, availableDays: days },
+    };
   }
 
   const hours = doctor.availableHours || {};
@@ -51,11 +55,11 @@ export async function getAvailableSlots(doctorId, date) {
 
   const bookedTimes = existing.map(a => {
     const t = new Date(a.appointmentTime);
-    return `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`;
+    return `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, '0')}`;
   });
 
   const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const today = isToday(date);
 
   const slots = [];
@@ -75,7 +79,7 @@ export async function createAppointment(data) {
 
   if (
     isToday(data.date) &&
-    toMinutes(data.time) < new Date().getHours() * 60 + new Date().getMinutes() + 120
+    toMinutes(data.time) < new Date().getUTCHours() * 60 + new Date().getUTCMinutes() + 120
   ) {
     throw new Error('That time is within 2 hours of now. Please pick a later slot.');
   }

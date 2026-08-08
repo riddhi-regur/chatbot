@@ -71,8 +71,8 @@ export default function Appointments() {
                   </td>
                   <td className="px-4 py-3">Dr. {appt.doctor?.name}</td>
                   <td className="px-4 py-3">{appt.service?.name}</td>
-                  <td className="px-4 py-3">{new Date(appt.appointmentDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">{new Date(appt.appointmentTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                  <td className="px-4 py-3">{new Date(appt.appointmentDate).toLocaleDateString([], { timeZone: 'UTC' })}</td>
+                  <td className="px-4 py-3">{new Date(appt.appointmentTime).toLocaleTimeString([], { timeZone: 'UTC', hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="px-4 py-3"><StatusBadge status={appt.status} /></td>
                   <td className="px-4 py-3">
                     <div className="flex gap-1">

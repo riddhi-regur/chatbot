@@ -4,13 +4,13 @@ import { sendAppointmentNotification } from '../services/chat.service.js';
 
 const STATUS_MESSAGES = {
   confirmed: (apt) =>
-    `Your appointment has been confirmed!\n\nBooking #${apt.id}\nService: ${apt.service.name}\nDoctor: ${apt.doctor.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}\nTime: ${new Date(apt.appointmentTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}\n\nWe look forward to seeing you!`,
+    `Your appointment has been confirmed!\n\nBooking #${apt.id}\nService: ${apt.service.name}\nDoctor: ${apt.doctor.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { timeZone: "UTC", weekday: "long", year: "numeric", month: "long", day: "numeric" })}\nTime: ${new Date(apt.appointmentTime).toLocaleTimeString("en-US", { timeZone: "UTC", hour: "2-digit", minute: "2-digit" })}\n\nWe look forward to seeing you!`,
   completed: (apt) =>
-    `Your appointment has been completed. Thank you for visiting ${apt.service.name} with ${apt.doctor.name} on ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.\n\nWe hope everything went well! If you have any questions, feel free to ask.`,
+    `Your appointment has been completed. Thank you for visiting ${apt.service.name} with ${apt.doctor.name} on ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}.\n\nWe hope everything went well! If you have any questions, feel free to ask.`,
   cancelled: (apt) =>
-    `Your appointment (Booking #${apt.id}) has been cancelled.\n\nService: ${apt.service.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}\n\nIf you need to reschedule, feel free to book a new appointment anytime.`,
+    `Your appointment (Booking #${apt.id}) has been cancelled.\n\nService: ${apt.service.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}\n\nIf you need to reschedule, feel free to book a new appointment anytime.`,
   booked: (apt) =>
-    `Your appointment has been updated to "Booked" status.\n\nBooking #${apt.id}\nService: ${apt.service.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+    `Your appointment has been updated to "Booked" status.\n\nBooking #${apt.id}\nService: ${apt.service.name}\nDate: ${new Date(apt.appointmentDate).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" })}`,
 };
 
 export async function getAppointments(req, res, next) {

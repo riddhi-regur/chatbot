@@ -74,6 +74,13 @@ export async function processMessage(visitorId, userMessage) {
   } else if (intent === "cancel_appointment") {
     response =
       "I can help you cancel your appointment. Could you please provide your name or phone number so I can look it up?";
+  } else if (intent === "general" && (await isBookingAttempt(userMessage))) {
+    response = await handleBookingIntent(
+      visitorId,
+      userMessage,
+      entities,
+      session,
+    );
   } else if (
     [
       "service_inquiry",
@@ -110,6 +117,29 @@ export async function processMessage(visitorId, userMessage) {
 }
 
 const NAME_STOPWORDS = /\b(today|tomorrow|yesterday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i;
+
+async function getBookingDoctorId(serviceId) {
+  const prisma = getPrisma();
+  const service = serviceId
+    ? await prisma.service.findUnique({
+        where: { id: serviceId },
+        select: { doctorId: true },
+      })
+    : null;
+  return service?.doctorId || 1;
+}
+
+async function isBookingAttempt(message) {
+  if (/(\+?\d[\d\s\-().]{7,}\d)/.test(message)) return true;
+  if (/\b(book|appointment|schedule)\b/i.test(message)) return true;
+  const prisma = getPrisma();
+  const services = await prisma.service.findMany({
+    where: { isActive: true },
+    select: { name: true },
+  });
+  const lower = message.toLowerCase();
+  return services.some((s) => s.name.toLowerCase().includes(lower));
+}
 
 async function handleBookingIntent(visitorId, message, entities, session) {
   const prisma = getPrisma();
@@ -241,9 +271,13 @@ async function handleBookingIntent(visitorId, message, entities, session) {
     const time = parseTimeFromMessage(message);
 
     if (date) {
-      const avail = await appointmentService.getAvailableSlots(1, date);
+      const doctorId = await getBookingDoctorId(bookingState.serviceId);
+      const avail = await appointmentService.getAvailableSlots(doctorId, date);
       if (!avail.available) {
-        return `I'm sorry, but the doctor isn't available on ${date}. Please choose a different date (e.g., tomorrow, monday, or a specific date like 2026-08-10).`;
+        const days = (avail.doctor?.availableDays || [])
+          .map((d) => d.charAt(0).toUpperCase() + d.slice(1))
+          .join(", ");
+        return `I'm sorry, but ${avail.doctor?.name || "the doctor"} isn't available on ${date}. The doctor works on: ${days}. Please pick one of those days (e.g., monday or a specific date like 2026-08-10).`;
       }
 
       const updated = { ...bookingState, date };
@@ -251,12 +285,18 @@ async function handleBookingIntent(visitorId, message, entities, session) {
 
       if (time) {
         if (time.hour < 9 || time.hour >= 17) {
-          return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(1, date)}`;
+          return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(doctorId, date)}`;
         }
         if (isWithinTwoHours(date, time.hour, time.min)) {
-          return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(1, date)}`;
+          return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${date}:\n${await getAvailableSlotsText(doctorId, date)}`;
         }
         const timeStr = `${time.hour}:${time.min}`;
+        const availSlots = await appointmentService.getAvailableSlots(doctorId, date);
+        const slotAvailable = availSlots.slots?.some((s) => s.time === timeStr && s.available);
+        if (!slotAvailable) {
+          const list = availSlots.slots?.filter((s) => s.available).map((s) => s.time).join(", ") || "None";
+          return `That time slot isn't available. Please pick from the available slots for ${date}:\n${list}`;
+        }
         session.bookingState = { ...updated, time: timeStr };
         if (!bookingState.patientPhone) {
           return "Thanks! One more thing — please provide your phone number so we can contact you regarding your appointment.";
@@ -272,25 +312,32 @@ async function handleBookingIntent(visitorId, message, entities, session) {
         );
       }
 
-      return `What time works for you on ${date}? Available slots:\n${await getAvailableSlotsText(1, date)}`;
+      return `What time works for you on ${date}? Available slots:\n${await getAvailableSlotsText(doctorId, date)}`;
     }
-    return "What date would you like the appointment? (e.g., tomorrow, 2024-01-15, monday)";
+    return "What date would you like the appointment? I can understand dates like 'today', 'tomorrow', 'monday', 'next friday', 'weekend', or a specific date like 2024-01-15.";
   }
 
   if (!bookingState.time) {
+    const doctorId = await getBookingDoctorId(bookingState.serviceId);
     const time = parseTimeFromMessage(message);
     if (time) {
       if (time.hour < 9 || time.hour >= 17) {
-        return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}`;
+        return `Please pick a time between 9:00 and 16:30.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(doctorId, bookingState.date)}`;
       }
       if (isWithinTwoHours(bookingState.date, time.hour, time.min)) {
-        return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}`;
+        return `That time (${time.hour}:${time.min}) is within 2 hours of now. Please pick a later slot.\n\nAvailable slots for ${bookingState.date}:\n${await getAvailableSlotsText(doctorId, bookingState.date)}`;
       }
       const timeStr = `${time.hour}:${time.min}`;
+      const availSlots = await appointmentService.getAvailableSlots(doctorId, bookingState.date);
+      const slotAvailable = availSlots.slots?.some((s) => s.time === timeStr && s.available);
+      if (!slotAvailable) {
+        const list = availSlots.slots?.filter((s) => s.available).map((s) => s.time).join(", ") || "None";
+        return `That time slot isn't available. Please pick from the available slots for ${bookingState.date}:\n${list}`;
+      }
       session.bookingState = { ...bookingState, time: timeStr };
       return "Thanks! One more thing — please provide your phone number so we can contact you regarding your appointment.";
     }
-    return `Available time slots for ${bookingState.date}:\n${await getAvailableSlotsText(1, bookingState.date)}\n\nPlease pick a time.`;
+    return `Available time slots for ${bookingState.date}:\n${await getAvailableSlotsText(doctorId, bookingState.date)}\n\nPlease pick a time.`;
   }
 
   if (!bookingState.patientPhone) {
@@ -488,6 +535,16 @@ function parseDateFromMessage(message) {
     const current = today.getDay();
     let diff = (target - current + 7) % 7;
     if (diff === 0) diff = 7;
+    const t = new Date(today);
+    t.setDate(t.getDate() + diff);
+    return toDateString(t);
+  }
+
+  if (/\b(?:this\s+|next\s+)?weekend\b/.test(msg)) {
+    const target = WEEKDAY_NAMES.saturday;
+    const current = today.getDay();
+    let diff = (target - current + 7) % 7;
+    if (/\bnext\s+weekend\b/.test(msg)) diff += 7;
     const t = new Date(today);
     t.setDate(t.getDate() + diff);
     return toDateString(t);
@@ -750,12 +807,14 @@ function buildAppointmentsResponse(names, appointments) {
       block += "**Upcoming:**\n";
       upcoming.forEach((a) => {
         const date = new Date(a.appointmentDate).toLocaleDateString("en-US", {
+          timeZone: "UTC",
           weekday: "long",
           year: "numeric",
           month: "long",
           day: "numeric",
         });
         const time = new Date(a.appointmentTime).toLocaleTimeString("en-US", {
+          timeZone: "UTC",
           hour: "2-digit",
           minute: "2-digit",
         });
@@ -768,10 +827,12 @@ function buildAppointmentsResponse(names, appointments) {
       block += "**Past:**\n";
       past.forEach((a) => {
         const date = new Date(a.appointmentDate).toLocaleDateString("en-US", {
+          timeZone: "UTC",
           month: "short",
           day: "numeric",
         });
         const time = new Date(a.appointmentTime).toLocaleTimeString("en-US", {
+          timeZone: "UTC",
           hour: "2-digit",
           minute: "2-digit",
         });
@@ -868,6 +929,10 @@ async function handleKnowledgeIntent(message, intent, entities, session) {
   return "I'm not sure about that. Could you rephrase your question? I can help with services, doctors, appointments, and general clinic information.";
 }
 
+function containsBookingClaim(text) {
+  return /\b(?:i'?ve booked|booking (?:has been )?confirmed|appointment (?:has been )?(?:booked|confirmed|scheduled)|confirmation email|booking #|your appointment is confirmed)\b/i.test(text);
+}
+
 async function handleGeneralIntent(message, session) {
   const trimmed = message.trim();
   const visitorId = session?.dbSession?.visitorId;
@@ -902,7 +967,11 @@ async function handleGeneralIntent(message, session) {
       { role: "system", content: systemPrompt },
       { role: "user", content: message },
     ];
-    return await generateChatResponse(messages);
+    const reply = await generateChatResponse(messages);
+    if (containsBookingClaim(reply)) {
+      return "I can help you book an appointment with our booking assistant. Just tell me your name and the service you need, and I'll take it from there.";
+    }
+    return reply;
   }
 
   if (knowledgeResults.length > 0) {

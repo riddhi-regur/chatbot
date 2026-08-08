@@ -18,6 +18,7 @@
 
   let isOpen = false;
   let messages = [];
+  const renderedIds = new Set();
 
   function createWidget() {
     const container = document.createElement("div");
@@ -66,6 +67,9 @@
       });
 
     loadHistory();
+    setInterval(() => {
+      if (isOpen) pollNotifications();
+    }, 3000);
   }
 
   function toggleChat() {
@@ -75,6 +79,7 @@
       .classList.toggle("open", isOpen);
     if (isOpen) {
       document.getElementById("clinicbot-input").focus();
+      pollNotifications();
     }
   }
 
@@ -128,12 +133,32 @@
           } else {
             addBotMessage(m.content);
           }
+          if (m.id) renderedIds.add(m.id);
         });
       } else {
         addBotMessage(CONFIG.greeting);
       }
     } catch {
       addBotMessage(CONFIG.greeting);
+    }
+  }
+
+  async function pollNotifications() {
+    try {
+      const res = await fetch(
+        `${CONFIG.apiUrl}/chat/history?visitorId=${encodeURIComponent(visitorId)}`,
+      );
+      const data = await res.json();
+      if (res.ok && data.messages) {
+        data.messages.forEach((m) => {
+          if (m.intent === "notification" && !renderedIds.has(m.id)) {
+            addBotMessage(m.content);
+            renderedIds.add(m.id);
+          }
+        });
+      }
+    } catch {
+      // ignore polling errors
     }
   }
 
